@@ -18,6 +18,8 @@ const els = {
   koContinueBtn: document.getElementById("koContinueBtn")
 };
 
+const KO_AUTO_CLOSE_MS = 3000;
+
 // ===== Sala desde URL =====
 function getRoomFromUrl() {
   const u = new URL(window.location.href);
@@ -50,7 +52,7 @@ let lastFlashedEventTurn = null; // para no repetir animación del mismo lastEve
 let lastKoEventTurn = null;
 let koAutoCloseToken = 0;
 
-function showKoModal(text, autoCloseMs = 3000) {
+function showKoModal(text, autoCloseMs = 1200) {
   if (!els.koModal) return;
 
   els.koText.textContent = text;
@@ -292,7 +294,7 @@ socket.on("room_state", (state) => {
     const msg = buildKoMessage(evt);
     if (msg) {
       lastKoEventTurn = evt.turn;
-      showKoModal(msg, 1200); // 0 si lo quieres solo con botón
+      showKoModal(msg, KO_AUTO_CLOSE_MS); // 0 si lo quieres solo con botón
     }
   }
 
