@@ -390,3 +390,8 @@ kbd {
   justify-content: flex-end;
   gap: 10px;
 }
+
+.footer span{
+  opacity: 0.65;
+  font-size: 11px;
+}
