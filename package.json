@@ -1,0 +1,14 @@
+{
+  "name": "turn-simultaneous-5x5",
+  "version": "1.0.0",
+  "description": "Two-player simultaneous-turn 5x5 board demo (Socket.IO).",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

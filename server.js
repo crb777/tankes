@@ -1,0 +1,517 @@
+// server.js — "tankes" (turnos simultáneos, 1 acción por turno)
+// Ejecuta: npm i express socket.io  &&  node server.js
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+
+const PORT = process.env.PORT || 3000;
+
+const app = express();
+app.use(express.static("public"));
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
+
+/**
+ * tankes (MVP)
+ * - 2 jugadores (A y B), 1 sala por URL
+ * - Tablero gridW x gridH
+ * - Muros: 0 vacío, 1 rompible, 2 indestructible
+ * - Tanques:
+ *    - body: (x,y) en casillas
+ *    - orientation: "H"|"V" (eje permitido para moverse)
+ *    - aim: (x,y) (mirilla libre; bombas vuelan y no se bloquean)
+ * - Turnos simultáneos:
+ *    Cada turno, cada jugador envía UNA acción:
+ *      { type:"MOVE", steps:0|1|2 }              (se mueve en su eje actual)
+ *      { type:"TURN" }                           (cambia H<->V)
+ *      { type:"AIM", dx:-2..2, dy:-2..2 }        (mueve mirilla)
+ *      { type:"FIRE" }                           (dispara a la mirilla)
+ *      { type:"WAIT" }                           (no hace nada)
+ * - Disparo: explota en cruz "+" (centro + N/S/E/W)
+ *      - Destruye muros rompibles (1 -> 0)
+ *      - Mata tanques en esas casillas => respawn
+ */
+
+const GRID_W = 12;
+const GRID_H = 12;
+
+const rooms = new Map();
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function inBounds(x, y) {
+  return x >= 0 && x < GRID_W && y >= 0 && y < GRID_H;
+}
+
+function key(x, y) {
+  return `${x},${y}`;
+}
+
+function deepCopyGrid(g) {
+  return g.map(row => row.slice());
+}
+
+// ---- Generación de mapa (MVP fijo y claro) ----
+function makeBaseGrid() {
+  const g = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
+
+  // Borde indestructible
+  for (let x = 0; x < GRID_W; x++) {
+    g[0][x] = 2;
+    g[GRID_H - 1][x] = 2;
+  }
+  for (let y = 0; y < GRID_H; y++) {
+    g[y][0] = 2;
+    g[y][GRID_W - 1] = 2;
+  }
+
+  // Algunos indestructibles internos (pilares)
+  const pillars = [
+    [3, 3], [8, 3],
+    [3, 8], [8, 8],
+    [6, 5], [6, 6]
+  ];
+  for (const [x, y] of pillars) g[y][x] = 2;
+
+  // Muros rompibles (zonas)
+  const breakables = [
+    // banda superior media
+    [4,1],[5,1],[6,1],[7,1],
+    // banda inferior media
+    [4,10],[5,10],[6,10],[7,10],
+    // bloques laterales
+    [1,4],[1,5],[1,6],
+    [10,4],[10,5],[10,6],
+    // algunos en centro
+    [5,4],[7,4],[5,7],[7,7]
+  ];
+  for (const [x, y] of breakables) {
+    if (g[y]?.[x] === 0) g[y][x] = 1;
+  }
+
+  return g;
+}
+
+// ---- Estado de sala ----
+function newRoom(roomId) {
+  const grid = makeBaseGrid();
+
+  const spawnA = { x: 1, y: 1 };
+  const spawnB = { x: GRID_W - 2, y: GRID_H - 2 };
+
+  return {
+    roomId,
+    players: { A: null, B: null },
+
+    grid, // 0 vacío, 1 rompible, 2 indestructible
+
+    tanks: {
+      A: {
+        body: { ...spawnA },
+        spawn: { ...spawnA },
+        orientation: "V", // eje vertical al inicio
+        face: "D", // A mira hacia abajo al inicio
+        aim: { x: spawnA.x, y: spawnA.y + 2 }
+      },
+      B: {
+        body: { ...spawnB },
+        spawn: { ...spawnB },
+        orientation: "V",
+        face: "U", // B mira hacia arriba al inicio
+        aim: { x: spawnB.x, y: spawnB.y - 2 }
+      }
+    },
+
+    turn: 1,
+    pending: { A: null, B: null }, // acción pendiente por jugador
+
+    // eventos del último turno para UI
+    lastEvent: null,
+    score: { A: 0, B: 0 }
+  };
+}
+
+// ---- Roles ----
+function assignRole(room, socketId) {
+  if (!room.players.A) { room.players.A = socketId; return "A"; }
+  if (!room.players.B) { room.players.B = socketId; return "B"; }
+  return "SPECTATOR";
+}
+
+function releaseRole(room, socketId) {
+  if (room.players.A === socketId) room.players.A = null;
+  if (room.players.B === socketId) room.players.B = null;
+}
+
+// ---- Serialización ----
+function sanitizeRoom(room, forRole) {
+  function tankView(who) {
+    const t = room.tanks[who];
+    return {
+      body: t.body,
+      orientation: t.orientation,
+      face: t.face,
+      aim: (forRole === who || forRole === "SPECTATOR") ? t.aim : null
+    };
+  }
+
+  return {
+    roomId: room.roomId,
+    occupied: { A: !!room.players.A, B: !!room.players.B },
+    gridW: GRID_W,
+    gridH: GRID_H,
+    grid: room.grid,
+    tanks: {
+      A: tankView("A"),
+      B: tankView("B")
+    },
+    turn: room.turn,
+    pending: { A: !!room.pending.A, B: !!room.pending.B },
+    lastEvent: room.lastEvent,
+    score: room.score
+  };
+}
+
+function broadcastRoom(room) {
+  for (const [role, socketId] of Object.entries(room.players)) {
+    if (!socketId) continue;
+    io.to(socketId).emit("room_state", sanitizeRoom(room, role));
+  }
+
+  // Espectadores (sin mirillas)
+  const spectators = io.sockets.adapter.rooms.get(room.roomId) || [];
+  for (const sid of spectators) {
+    if (sid !== room.players.A && sid !== room.players.B) {
+      io.to(sid).emit("room_state", sanitizeRoom(room, "SPECTATOR"));
+    }
+  }
+}
+
+// ---- Acciones (validación) ----
+function parseAction(payload) {
+  const t = payload?.type;
+
+  if (t === "MOVE") {
+    const steps = Number(payload?.steps);
+    if (!Number.isFinite(steps)) return null;
+    if (![ -2, -1, 0, 1, 2 ].includes(steps)) return null;
+    return { type: "MOVE", steps };
+  }
+
+  if (t === "TURN") return { type: "TURN" };
+
+  if (t === "AIM") {
+    const dx = Number(payload?.dx);
+    const dy = Number(payload?.dy);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+    if (dx < -2 || dx > 2 || dy < -2 || dy > 2) return null;
+    // permitir AIM (0,0) como "mantener" si lo desean
+    return { type: "AIM", dx, dy };
+  }
+
+  if (t === "FIRE") return { type: "FIRE" };
+
+  if (t === "WAIT") return { type: "WAIT" };
+
+  return null;
+}
+
+// ---- Reglas de movimiento ----
+function isBlocked(grid, x, y) {
+  if (!inBounds(x, y)) return true;
+  return grid[y][x] !== 0; // muros (1 o 2) bloquean el cuerpo del tanque
+}
+
+function rotateClockwise(face) {
+  switch (face) {
+    case "U": return "R";
+    case "R": return "D";
+    case "D": return "L";
+    case "L": return "U";
+    default: return "U";
+  }
+}
+
+function faceToOrientation(face) {
+  return (face === "U" || face === "D") ? "V" : "H";
+}
+
+function moveTank(room, who, steps) {
+  const t = room.tanks[who];
+  const absSteps = Math.abs(steps);
+  const dir = Math.sign(steps); // -1,0,+1
+  if (dir === 0 || absSteps === 0) return;
+
+  // Vector según hacia dónde mira
+  let fx = 0, fy = 0;
+  switch (t.face) {
+    case "U": fy = -1; break;
+    case "D": fy =  1; break;
+    case "L": fx = -1; break;
+    case "R": fx =  1; break;
+  }
+
+  // Si steps es negativo, va marcha atrás
+  const dx = fx * dir;
+  const dy = fy * dir;
+
+  let x = t.body.x;
+  let y = t.body.y;
+
+  for (let i = 0; i < absSteps; i++) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (isBlocked(room.grid, nx, ny)) break;
+    x = nx; y = ny;
+  }
+
+  t.body = { x, y };
+}
+
+// ---- Explosión en cruz "+" ----
+function crossCells(cx, cy) {
+  const cells = [
+    [cx, cy],
+    [cx + 1, cy],
+    [cx - 1, cy],
+    [cx, cy + 1],
+    [cx, cy - 1]
+  ];
+  return cells.filter(([x, y]) => inBounds(x, y));
+}
+
+function applyExplosion(room, cx, cy) {
+  const cells = crossCells(cx, cy);
+
+  // 1) Romper muros rompibles
+  for (const [x, y] of cells) {
+    if (room.grid[y][x] === 1) room.grid[y][x] = 0;
+  }
+
+  // 2) Matar tanques en la cruz
+  const killed = [];
+  for (const who of ["A", "B"]) {
+    const t = room.tanks[who];
+    if (cells.some(([x, y]) => x === t.body.x && y === t.body.y)) {
+      killed.push(who);
+    }
+  }
+  for (const who of killed) {
+    respawn(room, who);
+  }
+
+  return { cells, killed };
+}
+
+function respawn(room, who) {
+  const t = room.tanks[who];
+  // respawn simple: a su spawn si está libre; si no, buscar alrededor
+  const candidates = [
+    [t.spawn.x, t.spawn.y],
+    [t.spawn.x + 1, t.spawn.y],
+    [t.spawn.x - 1, t.spawn.y],
+    [t.spawn.x, t.spawn.y + 1],
+    [t.spawn.x, t.spawn.y - 1]
+  ].filter(([x, y]) => inBounds(x, y));
+
+  for (const [x, y] of candidates) {
+    const free = room.grid[y][x] === 0
+      && !(room.tanks.A.body.x === x && room.tanks.A.body.y === y)
+      && !(room.tanks.B.body.x === x && room.tanks.B.body.y === y);
+    if (free) {
+      t.body = { x, y };
+      // mantén orientación y aim, pero reajusta aim si cae fuera
+      t.aim = { x: clamp(t.aim.x, 0, GRID_W - 1), y: clamp(t.aim.y, 0, GRID_H - 1) };
+      return;
+    }
+  }
+
+  // Si no hay sitio, coloca igualmente (caso extremo)
+  t.body = { ...t.spawn };
+}
+
+// ---- Resolución de turno (simultáneo) ----
+function resolveTurn(room) {
+  const aAct = room.pending.A;
+  const bAct = room.pending.B;
+  if (!aAct || !bAct) return;
+
+  room.lastEvent = { turn: room.turn, explosions: [] };
+
+  // Copias del estado previo para referencias si las necesitas después
+  const prev = {
+    grid: deepCopyGrid(room.grid),
+    tanks: {
+      A: { body: { ...room.tanks.A.body }, orientation: room.tanks.A.orientation, aim: { ...room.tanks.A.aim } },
+      B: { body: { ...room.tanks.B.body }, orientation: room.tanks.B.orientation, aim: { ...room.tanks.B.aim } }
+    }
+  };
+
+  // 1) TURN (orientaciones + dirección)
+  for (const who of ["A", "B"]) {
+    const act = room.pending[who];
+    if (act.type === "TURN") {
+      const t = room.tanks[who];
+      t.face = rotateClockwise(t.face);
+      t.orientation = faceToOrientation(t.face);
+    }
+  }
+
+  // 2) MOVE (posiciones)
+  // (Se resuelve sin colisión tanque-tanque en este MVP; si chocan, los dejaremos coexistir? Mejor: rebote.)
+  // Primero aplicamos movimientos tentativos:
+  const nextPos = { A: { ...room.tanks.A.body }, B: { ...room.tanks.B.body } };
+
+  for (const who of ["A", "B"]) {
+    const act = room.pending[who];
+    if (act.type === "MOVE") {
+      // mover sobre una copia temporal: clonamos y aplicamos sobre room directamente
+      const before = { ...room.tanks[who].body };
+      moveTank(room, who, act.steps);
+      nextPos[who] = { ...room.tanks[who].body };
+      // restauraremos si hay rebote, así que guardamos before
+      room.tanks[who].body = before;
+    }
+  }
+
+  // Resolver colisión tanque-tanque: si acaban en la misma casilla o swap => ambos se quedan donde estaban
+  const aFrom = { ...room.tanks.A.body };
+  const bFrom = { ...room.tanks.B.body };
+  const aTo = nextPos.A;
+  const bTo = nextPos.B;
+
+  const same = (aTo.x === bTo.x && aTo.y === bTo.y);
+  const swap = (aTo.x === bFrom.x && aTo.y === bFrom.y && bTo.x === aFrom.x && bTo.y === aFrom.y);
+
+  if (!same && !swap) {
+    room.tanks.A.body = aTo;
+    room.tanks.B.body = bTo;
+  } else {
+    room.tanks.A.body = aFrom;
+    room.tanks.B.body = bFrom;
+    room.lastEvent.moveBounce = true;
+  }
+
+  // 3) AIM (mirillas)
+  for (const who of ["A", "B"]) {
+    const act = room.pending[who];
+    if (act.type === "AIM") {
+      const t = room.tanks[who];
+      const nx = clamp(t.aim.x + act.dx, 0, GRID_W - 1);
+      const ny = clamp(t.aim.y + act.dy, 0, GRID_H - 1);
+      t.aim = { x: nx, y: ny };
+    }
+  }
+
+  // 4) FIRE (explosiones)
+  // Regla: ambos disparos se aplican (si los dos disparan, pueden matarse ambos).
+  const fires = [];
+  for (const who of ["A", "B"]) {
+    const act = room.pending[who];
+    if (act.type === "FIRE") {
+      const t = room.tanks[who];
+      fires.push({ who, x: t.aim.x, y: t.aim.y });
+    }
+  }
+
+  for (const f of fires) {
+    const res = applyExplosion(room, f.x, f.y);
+
+    // Puntuación: 1 punto por cada KO al rival (no puntúa el suicidio)
+    for (const victim of (res.killed || [])) {
+      if (victim !== f.who) {
+        room.score[f.who] = (room.score[f.who] || 0) + 1;
+      }
+    }
+
+    room.lastEvent.explosions.push({ by: f.who, at: { x: f.x, y: f.y }, ...res });
+  }
+
+  // 5) limpiar pendings y avanzar turno
+  room.pending.A = null;
+  room.pending.B = null;
+  room.turn += 1;
+
+  broadcastRoom(room);
+}
+
+// ---- Socket.IO ----
+io.on("connection", (socket) => {
+  socket.on("join_room", ({ roomId }) => {
+    if (!roomId || typeof roomId !== "string") return;
+
+    if (!rooms.has(roomId)) rooms.set(roomId, newRoom(roomId));
+    const room = rooms.get(roomId);
+
+    socket.join(roomId);
+
+    const role = assignRole(room, socket.id);
+    socket.data.roomId = roomId;
+    socket.data.role = role;
+
+    socket.emit("your_role", { role, roomId });
+    broadcastRoom(room);
+  });
+
+  socket.on("submit_action", (payload) => {
+    const roomId = socket.data.roomId;
+    const role = socket.data.role;
+    if (!roomId || !role) return;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+    if (role !== "A" && role !== "B") return;
+
+    // Solo 1 acción por turno
+    if (room.pending[role]) return;
+
+    const act = parseAction(payload);
+    if (!act) return;
+
+    room.pending[role] = act;
+    broadcastRoom(room);
+    resolveTurn(room);
+  });
+
+  socket.on("reset_game", () => {
+    const roomId = socket.data.roomId;
+    const role = socket.data.role;
+    if (!roomId) return;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Solo jugadores A/B pueden resetear
+    if (role !== "A" && role !== "B") return;
+
+    // Mantener ocupación
+    const fresh = newRoom(roomId);
+    fresh.players = { ...room.players };
+    rooms.set(roomId, fresh);
+    broadcastRoom(fresh);
+  });
+
+  socket.on("disconnect", () => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    releaseRole(room, socket.id);
+
+    // limpiar sala si queda vacía
+    const empty = !room.players.A && !room.players.B;
+    if (empty) rooms.delete(roomId);
+    else broadcastRoom(room);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`tankes server en http://localhost:${PORT}`);
+});

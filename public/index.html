@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tankes — combate táctico por turnos</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>tankes</h1>
+    <p class="subtitle">Combate táctico por turnos simultáneos</p>
+
+    <!-- INFO DE SALA -->
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="label">Sala</div>
+          <div class="mono" id="roomId">—</div>
+          <div class="hint">Comparte este enlace para que otro jugador se una.</div>
+        </div>
+
+        <div>
+          <div class="label">Tu rol</div>
+          <div class="mono" id="role">—</div>
+          <div class="hint">A y B juegan. El resto observa.</div>
+        </div>
+
+        <div class="actions">
+          <button id="copyLinkBtn" class="btn">Copiar enlace</button>
+          <button id="resetBtn" class="btn btn-secondary">Reset</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="label">Turno</div>
+          <div class="mono" id="turn">—</div>
+        </div>
+        <div>
+          <div class="label">Acciones pendientes</div>
+          <div class="mono" id="pending">—</div>
+        </div>
+        <div class="grow">
+          <div class="label">Estado</div>
+          <div class="mono status" id="status">Conectando…</div>
+        </div>
+        <div>
+          <div class="label">Puntuación</div>
+          <div class="mono" id="score">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLERO -->
+    <section class="card">
+      <div class="board" id="board" aria-label="Tablero de juego"></div>
+
+      <div class="controls">
+        <div class="hint">
+          <strong>Controles</strong><br />
+          <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> o <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>:
+          mover mirilla (<kbd>Shift</kbd> = 2 casillas)<br />
+
+          <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>1</kbd> <kbd>2</kbd>:
+          mover tanque (−2 / −1 / 0 / +1 / +2 según hacia dónde mire)<br />
+
+          <kbd>Espacio</kbd>: girar tanque (90° sentido horario)<br />
+          <kbd>Enter</kbd>: disparar (a la mirilla)<br />
+          <kbd>Backspace</kbd>: esperar
+        </div>
+
+        <div class="hint" style="margin-top:10px">
+          <strong>Reglas básicas</strong>
+          <ul>
+            <li>Ambos jugadores eligen <strong>una acción por turno</strong></li>
+            <li>Las acciones se resuelven <strong>simultáneamente</strong></li>
+            <li>Los tanques tienen una <strong>dirección</strong> (↑ ↓ ← →) que afecta al movimiento</li>
+            <li>Las bombas explotan en cruz “+” (centro + N/S/E/W)</li>
+            <li>Los muros claros se destruyen; los oscuros son indestructibles</li>
+            <li>Si un tanque muere, <strong>reaparece en su base</strong></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- PIE -->
+    <footer class="footer">
+      <span>tankes — prototipo</span>
+    </footer>
+  </main>
+
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
