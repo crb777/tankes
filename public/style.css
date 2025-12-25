@@ -346,3 +346,47 @@ kbd {
   40%  { transform: scale(1.04); }
   100% { transform: scale(1.00); }
 }
+
+/* ===== Modal KO ===== */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.55);
+  z-index: 9999;
+  padding: 16px;
+}
+
+.modal-overlay.hidden{
+  display: none;
+}
+
+.modal{
+  width: min(520px, 95vw);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+
+.modal-title{
+  font-weight: 800;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.modal-body{
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+
+.modal-actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

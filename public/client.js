@@ -10,7 +10,12 @@ const els = {
   status: document.getElementById("status"),
   board: document.getElementById("board"),
   copyLinkBtn: document.getElementById("copyLinkBtn"),
-  resetBtn: document.getElementById("resetBtn")
+  resetBtn: document.getElementById("resetBtn"),
+
+  // Modal KO
+  koModal: document.getElementById("koModal"),
+  koText: document.getElementById("koText"),
+  koContinueBtn: document.getElementById("koContinueBtn")
 };
 
 // ===== Sala desde URL =====
@@ -40,6 +45,49 @@ const pressed = new Set();
 let flashCells = new Set();  // conjunto de "x,y"
 let flashToken = 0;          // para invalidar timeouts antiguos
 let lastFlashedEventTurn = null; // para no repetir animación del mismo lastEvent
+
+// ===== Modal KO =====
+let lastKoEventTurn = null;
+let koAutoCloseToken = 0;
+
+function showKoModal(text, autoCloseMs = 3000) {
+  if (!els.koModal) return;
+
+  els.koText.textContent = text;
+  els.koModal.classList.remove("hidden");
+  els.koModal.setAttribute("aria-hidden", "false");
+
+  const myToken = ++koAutoCloseToken;
+  if (autoCloseMs > 0) {
+    setTimeout(() => {
+      if (koAutoCloseToken !== myToken) return;
+      hideKoModal();
+    }, autoCloseMs);
+  }
+}
+
+function hideKoModal() {
+  if (!els.koModal) return;
+  els.koModal.classList.add("hidden");
+  els.koModal.setAttribute("aria-hidden", "true");
+}
+
+function buildKoMessage(evt) {
+  const ex = evt?.explosions || [];
+  const killed = new Set();
+
+  for (const e of ex) {
+    for (const v of (e.killed || [])) killed.add(v);
+  }
+
+  if (killed.size === 0) return null;
+
+  const victims = Array.from(killed).sort().join(" y ");
+  if (killed.size === 2) return `Doble KO: ${victims}.`;
+
+  return `KO: ${victims}.`;
+}
+
 
 // ===== Helpers =====
 function setStatus(text) {
@@ -239,6 +287,15 @@ socket.on("room_state", (state) => {
     }, 500);
   }
 
+  // ===== Modal KO (si hubo muertes) =====
+  if (evt && typeof evt.turn === "number" && evt.turn !== lastKoEventTurn) {
+    const msg = buildKoMessage(evt);
+    if (msg) {
+      lastKoEventTurn = evt.turn;
+      showKoModal(msg, 1200); // 0 si lo quieres solo con botón
+    }
+  }
+
   // UI básica
   els.turn.textContent = state.turn;
 
@@ -283,9 +340,31 @@ els.copyLinkBtn.addEventListener("click", async () => {
 
 els.resetBtn.addEventListener("click", () => {
   lastFlashedEventTurn = null;
+  lastKoEventTurn = null;
   flashCells = new Set();
+  koAutoCloseToken++;
+  hideKoModal();
   socket.emit("reset_game");
 });
+
+// ===== Modal KO eventos =====
+if (els.koContinueBtn) {
+  els.koContinueBtn.addEventListener("click", () => {
+    // invalida autocierre anterior y cierra
+    koAutoCloseToken++;
+    hideKoModal();
+  });
+}
+
+// Cerrar si haces click fuera del cuadro
+if (els.koModal) {
+  els.koModal.addEventListener("click", (e) => {
+    if (e.target === els.koModal) {
+      koAutoCloseToken++;
+      hideKoModal();
+    }
+  });
+}
 
 // ===== Eventos teclado =====
 window.addEventListener("keydown", onKeyDown);
