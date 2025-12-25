@@ -7,6 +7,14 @@ import { Server } from "socket.io";
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+app.use((req, res, next) => {
+  if (req.path === "/" || req.path.endsWith(".html")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
 app.use(express.static("public"));
 
 const server = http.createServer(app);
