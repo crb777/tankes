@@ -40,6 +40,10 @@ let lastState = null;
 let myRole = "—";
 let canActNow = false;
 
+// Para mostrar qué acción has elegido en este turno
+let myLastAction = null;
+let myLastActionTurn = null;
+
 // Para evitar repetición (key repeat)
 const pressed = new Set();
 
@@ -176,9 +180,65 @@ function prettyLastEvent(evt) {
   return pieces.join(" · ");
 }
 
+// ===== UI helpers: acciones y pendientes =====
+function describeAction(action) {
+  if (!action || !action.type) return "—";
+
+  if (action.type === "AIM") {
+    const dx = action.dx;
+    const dy = action.dy;
+    return `Apuntar (dx=${dx}, dy=${dy})`;
+  }
+  if (action.type === "MOVE") {
+    const s = action.steps;
+    if (s === 0) return "Mover (0) — sin movimiento";
+    return `Mover (${s > 0 ? "+" : ""}${s})`;
+  }
+  if (action.type === "TURN") return "Girar (90°)";
+  if (action.type === "FIRE") return "Disparar";
+  if (action.type === "WAIT") return "Esperar";
+
+  return action.type;
+}
+
+function buildPendingText(state) {
+  if (!state || !state.pending) return "Pendiente: —";
+
+  const pA = !!state.pending.A;
+  const pB = !!state.pending.B;
+
+  // Si ya están las dos, el turno está a punto de resolverse
+  if (pA && pB) return "Acciones recibidas: A y B. Resolviendo turno…";
+
+  // Si no hay ninguna, es inicio de turno
+  if (!pA && !pB) return "Esperando acciones: A y B.";
+
+  // Falta una
+  const missing = [];
+  if (!pA) missing.push("A");
+  if (!pB) missing.push("B");
+
+  // Mensaje orientado al usuario si es jugador
+  if (myRole === "A" || myRole === "B") {
+    const meMissing = (myRole === "A" && !pA) || (myRole === "B" && !pB);
+    if (meMissing) {
+      return `Falta tu acción (${myRole}). Esperando también: ${missing.join(" y ")}.`;
+    }
+    return `Tu acción ya está enviada. Falta la acción de: ${missing.join(" y ")}.`;
+  }
+
+  // Espectador
+  return `Falta la acción de: ${missing.join(" y ")}.`;
+}
+
 // ===== Envío de acciones =====
 function sendAction(action) {
   if (!canActNow) return;
+
+  // Guarda lo que has enviado para poder mostrarlo en UI
+  myLastAction = action;
+  myLastActionTurn = lastState ? lastState.turn : null;
+
   socket.emit("submit_action", action);
 }
 
@@ -301,15 +361,12 @@ socket.on("room_state", (state) => {
   // UI básica
   els.turn.textContent = state.turn;
 
-  // (Recomendado) Ocultar pistas: no mostrar estado por jugador, solo genérico.
-  // Si quieres mantenerlo, deja tu línea original.
+  // Acciones pendientes (texto claro)
   if (els.pending) {
-    els.pending.textContent = state.pending && (state.pending.A || state.pending.B)
-      ? "Pendiente: esperando acciones…"
-      : "Pendiente: —";
+    els.pending.textContent = buildPendingText(state);
   }
 
-  // Marcador (si existe en el HTML)
+  // Marcador
   if (els.score && state.score) {
     els.score.textContent = `A ${state.score.A} – ${state.score.B} B`;
   }
@@ -320,12 +377,22 @@ socket.on("room_state", (state) => {
   const canMoveNow = isPlayer && !state.pending[myRole];
   setControlsEnabled(canMoveNow);
 
+  // Estado: mostrar acción elegida y situación del turno
   if (!isPlayer) {
+    // espectador
     setStatus("Observando partida.");
-  } else if (canMoveNow) {
-    setStatus("Tu turno. Elige 1 acción.");
   } else {
-    setStatus("Acción enviada. Esperando al otro jugador…");
+    if (canMoveNow) {
+      // Turno nuevo o aún no has enviado acción
+      myLastAction = null;
+      myLastActionTurn = null;
+      setStatus("Tu turno: elige 1 acción.");
+    } else {
+      // Ya enviaste acción: indica cuál
+      const sameTurn = (myLastActionTurn === state.turn);
+      const actionText = sameTurn ? describeAction(myLastAction) : "—";
+      setStatus(`Tu acción: ${actionText}. Esperando al otro jugador…`);
+    }
   }
 });
 
