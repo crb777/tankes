@@ -347,6 +347,88 @@ kbd {
   100% { transform: scale(1.00); }
 }
 
+/* ===== Panel de controles (móvil) ===== */
+.control-panel{
+  flex: 1 1 520px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.cp-title{
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.cp-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.cp-group{
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(0,0,0,0.12);
+}
+
+.cp-label{
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.cp-row{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cp-btn{
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 54px;
+  text-align: center;
+}
+
+.cp-btn:disabled{
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cp-btn-primary{
+  background: var(--btn);
+  border-color: rgba(255,255,255,0.10);
+  color: #fff;
+}
+
+.cp-btn-secondary{
+  background: var(--btn2);
+  border-color: rgba(255,255,255,0.10);
+  color: #fff;
+}
+
+.cp-hint{
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* En pantallas anchas, que quede más compacto */
+@media (min-width: 900px){
+  .cp-grid{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /* ===== Modal KO ===== */
 .modal-overlay{
   position: fixed;

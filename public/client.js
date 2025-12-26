@@ -12,6 +12,10 @@ const els = {
   copyLinkBtn: document.getElementById("copyLinkBtn"),
   resetBtn: document.getElementById("resetBtn"),
 
+  // Controles por botones
+  controlPanel: document.getElementById("controlPanel"),
+  controlHint: document.getElementById("controlHint")
+
   // Modal KO
   koModal: document.getElementById("koModal"),
   koText: document.getElementById("koText"),
@@ -43,9 +47,6 @@ let canActNow = false;
 // Para mostrar qué acción has elegido en este turno
 let myLastAction = null;
 let myLastActionTurn = null;
-
-// Para evitar repetición (key repeat)
-const pressed = new Set();
 
 // ===== Explosión temporal =====
 let flashCells = new Set();  // conjunto de "x,y"
@@ -101,8 +102,13 @@ function setStatus(text) {
 }
 
 function setControlsEnabled(enabled) {
-  // MVP sin botones de acción; solo teclado.
   canActNow = enabled;
+
+  // Habilitar/deshabilitar botones del panel
+  if (els.controlPanel) {
+    const btns = els.controlPanel.querySelectorAll("button[data-action-type]");
+    btns.forEach(b => (b.disabled = !enabled));
+  }
 }
 
 function renderBoard(state) {
@@ -242,6 +248,47 @@ function sendAction(action) {
   socket.emit("submit_action", action);
 }
 
+function parseActionFromButton(btn) {
+  const t = btn.dataset.actionType;
+  if (!t) return null;
+
+  if (t === "AIM") {
+    const dx = Number(btn.dataset.dx);
+    const dy = Number(btn.dataset.dy);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+    return { type: "AIM", dx, dy };
+  }
+
+  if (t === "MOVE") {
+    const steps = Number(btn.dataset.steps);
+    if (!Number.isFinite(steps)) return null;
+    return { type: "MOVE", steps };
+  }
+
+  if (t === "TURN") return { type: "TURN" };
+  if (t === "FIRE") return { type: "FIRE" };
+  if (t === "WAIT") return { type: "WAIT" };
+
+  return null;
+}
+
+function bindButtonControls() {
+  if (!els.controlPanel) return;
+
+  els.controlPanel.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action-type]");
+    if (!btn) return;
+
+    // Si no eres jugador, no haces nada
+    if (!(myRole === "A" || myRole === "B")) return;
+
+    const action = parseActionFromButton(btn);
+    if (!action) return;
+
+    sendAction(action);
+  });
+}
+
 // Acciones (MVP teclado):
 // - Flechas: AIM (mueve mirilla 1)
 // - Shift + flecha: AIM (mueve mirilla 2)
@@ -251,56 +298,6 @@ function sendAction(action) {
 // - Z/X/C/1/2: MOVE steps (-2..+2)
 // - Backspace: WAIT
 
-function onKeyDown(e) {
-  // Ignorar si escribes en inputs
-  const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
-  if (tag === "input" || tag === "textarea") return;
-
-  if (pressed.has(e.code)) return;
-  pressed.add(e.code);
-
-  if (!lastState) return;
-  if (!(myRole === "A" || myRole === "B")) return;
-
-  // Si ya envié acción este turno, no sigo
-  if (!canActNow) return;
-
-  const isShift = e.shiftKey;
-  const stepAim = isShift ? 2 : 1;
-
-  // ===== AIM con flechas =====
-  if (e.code === "ArrowUp")    { sendAction({ type: "AIM", dx: 0, dy: -stepAim }); e.preventDefault(); return; }
-  if (e.code === "ArrowDown")  { sendAction({ type: "AIM", dx: 0, dy:  stepAim }); e.preventDefault(); return; }
-  if (e.code === "ArrowLeft")  { sendAction({ type: "AIM", dx: -stepAim, dy: 0 }); e.preventDefault(); return; }
-  if (e.code === "ArrowRight") { sendAction({ type: "AIM", dx:  stepAim, dy: 0 }); e.preventDefault(); return; }
-
-  // ===== AIM con WASD =====
-  if (e.code === "KeyW") { sendAction({ type: "AIM", dx: 0, dy: -1 }); e.preventDefault(); return; }
-  if (e.code === "KeyS") { sendAction({ type: "AIM", dx: 0, dy:  1 }); e.preventDefault(); return; }
-  if (e.code === "KeyA") { sendAction({ type: "AIM", dx: -1, dy: 0 }); e.preventDefault(); return; }
-  if (e.code === "KeyD") { sendAction({ type: "AIM", dx:  1, dy: 0 }); e.preventDefault(); return; }
-
-  // ===== TURN =====
-  if (e.code === "Space") { sendAction({ type: "TURN" }); e.preventDefault(); return; }
-
-  // ===== FIRE =====
-  if (e.code === "Enter") { sendAction({ type: "FIRE" }); e.preventDefault(); return; }
-
-  // ===== MOVE (-2 .. +2) =====
-  if (e.code === "KeyZ") { sendAction({ type: "MOVE", steps: -2 }); e.preventDefault(); return; }
-  if (e.code === "KeyX") { sendAction({ type: "MOVE", steps: -1 }); e.preventDefault(); return; }
-  if (e.code === "KeyC") { sendAction({ type: "MOVE", steps:  0 }); e.preventDefault(); return; }
-
-  if (e.code === "Digit1" || e.code === "Numpad1") { sendAction({ type: "MOVE", steps: 1 }); e.preventDefault(); return; }
-  if (e.code === "Digit2" || e.code === "Numpad2") { sendAction({ type: "MOVE", steps: 2 }); e.preventDefault(); return; }
-
-  // ===== WAIT =====
-  if (e.code === "Backspace") { sendAction({ type: "WAIT" }); e.preventDefault(); return; }
-}
-
-function onKeyUp(e) {
-  pressed.delete(e.code);
-}
 
 // ===== Socket events =====
 socket.on("connect", () => {
@@ -315,7 +312,7 @@ socket.on("your_role", ({ role }) => {
   if (role === "SPECTATOR") {
     setStatus("Sala llena: estás como espectador.");
   } else {
-    setStatus("Listo. Controles: Flechas/WASD apuntar (Shift=2). Z/X/C/1/2 mover (-2..+2). Espacio girar. Enter disparar. Backspace esperar.");
+    setStatus("Listo. Usa los botones para elegir 1 acción por turno.");
   }
 });
 
@@ -436,5 +433,6 @@ if (els.koModal) {
 }
 
 // ===== Eventos teclado =====
-window.addEventListener("keydown", onKeyDown);
-window.addEventListener("keyup", onKeyUp);
+
+// ===== Controles por botones =====
+bindButtonControls();

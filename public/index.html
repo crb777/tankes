@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>tankes — combate táctico por turnos</title>
-  <link rel="stylesheet" href="style.css?v=3549d94" />
+  <link rel="stylesheet" href="style.css?v=0.6.3" />
 </head>
 <body>
   <main class="wrap">
@@ -61,32 +61,75 @@
     <section class="card">
       <div class="board" id="board" aria-label="Tablero de juego"></div>
 
-      <div class="controls">
-        <div class="hint">
-          <strong>Controles</strong><br />
-          <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> o <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>:
-          mover mirilla (<kbd>Shift</kbd> = 2 casillas)<br />
+        <div class="controls">
+          <!-- Panel de botones (móvil/desktop) -->
+          <div class="control-panel" id="controlPanel" aria-label="Controles de juego">
+            <div class="cp-title">Acción del turno</div>
 
-          <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>1</kbd> <kbd>2</kbd>:
-          mover tanque (−2 / −1 / 0 / +1 / +2 según hacia dónde mire)<br />
+            <div class="cp-grid">
+              <!-- MIRILLA VERTICAL -->
+              <div class="cp-group">
+                <div class="cp-label">Mirilla vertical</div>
+                <div class="cp-row">
+                  <button class="cp-btn" data-action-type="AIM" data-dx="0" data-dy="-2">↑↑</button>
+                  <button class="cp-btn" data-action-type="AIM" data-dx="0" data-dy="-1">↑</button>
+                  <button class="cp-btn" data-action-type="AIM" data-dx="0" data-dy="1">↓</button>
+                  <button class="cp-btn" data-action-type="AIM" data-dx="0" data-dy="2">↓↓</button>
+                </div>
+              </div>
 
-          <kbd>Espacio</kbd>: girar tanque (90° sentido horario)<br />
-          <kbd>Enter</kbd>: disparar (a la mirilla)<br />
-          <kbd>Backspace</kbd>: esperar
+              <!-- MIRILLA HORIZONTAL -->
+              <div class="cp-group">
+                <div class="cp-label">Mirilla horizontal</div>
+                <div class="cp-row">
+                  <button class="cp-btn" data-action-type="AIM" data-dx="-2" data-dy="0">←←</button>
+                  <button class="cp-btn" data-action-type="AIM" data-dx="-1" data-dy="0">←</button>
+                  <button class="cp-btn" data-action-type="AIM" data-dx="1" data-dy="0">→</button>
+                  <button class="cp-btn" data-action-type="AIM" data-dx="2" data-dy="0">→→</button>
+                </div>
+              </div>
+
+              <!-- MOVER TANQUE -->
+              <div class="cp-group">
+                <div class="cp-label">Mover tanque</div>
+                <div class="cp-row">
+                  <button class="cp-btn" data-action-type="MOVE" data-steps="-2">-2</button>
+                  <button class="cp-btn" data-action-type="MOVE" data-steps="-1">-1</button>
+                  <button class="cp-btn" data-action-type="MOVE" data-steps="1">+1</button>
+                  <button class="cp-btn" data-action-type="MOVE" data-steps="2">+2</button>
+                </div>
+              </div>
+
+              <!-- ACCIONES DIRECTAS -->
+              <div class="cp-group">
+                <div class="cp-label">Acciones</div>
+                <div class="cp-row">
+                  <button class="cp-btn cp-btn-secondary" data-action-type="TURN">Girar</button>
+                  <button class="cp-btn cp-btn-primary" data-action-type="FIRE">Disparar</button>
+                  <button class="cp-btn cp-btn-secondary" data-action-type="WAIT">Esperar</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cp-hint" id="controlHint">
+              Si eres A o B, elige <strong>una</strong> acción por turno.
+            </div>
+          </div>
+
+          <!-- Reglas (las dejamos) -->
+          <div class="hint" style="margin-top:10px">
+            <strong>Reglas básicas</strong>
+            <ul>
+              <li>Ambos jugadores eligen <strong>una acción por turno</strong></li>
+              <li>Las acciones se resuelven <strong>simultáneamente</strong></li>
+              <li>Los tanques tienen una <strong>dirección</strong> (↑ ↓ ← →) que afecta al movimiento</li>
+              <li>Las bombas explotan en cruz “+” (centro + N/S/E/W)</li>
+              <li>Los muros claros se destruyen; los oscuros son indestructibles</li>
+              <li>Si un tanque muere, <strong>reaparece en su base</strong></li>
+            </ul>
+          </div>
         </div>
-
-        <div class="hint" style="margin-top:10px">
-          <strong>Reglas básicas</strong>
-          <ul>
-            <li>Ambos jugadores eligen <strong>una acción por turno</strong></li>
-            <li>Las acciones se resuelven <strong>simultáneamente</strong></li>
-            <li>Los tanques tienen una <strong>dirección</strong> (↑ ↓ ← →) que afecta al movimiento</li>
-            <li>Las bombas explotan en cruz “+” (centro + N/S/E/W)</li>
-            <li>Los muros claros se destruyen; los oscuros son indestructibles</li>
-            <li>Si un tanque muere, <strong>reaparece en su base</strong></li>
-          </ul>
-        </div>
-      </div>
+        
     </section>
 
     <!-- PIE -->
