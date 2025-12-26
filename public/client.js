@@ -357,24 +357,28 @@ socket.on("room_state", (state) => {
 });
 
 // ===== Botones UI =====
-els.copyLinkBtn.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(window.location.href);
-    els.copyLinkBtn.textContent = "Enlace copiado";
-    setTimeout(() => (els.copyLinkBtn.textContent = "Copiar enlace"), 1200);
-  } catch (e) {
-    prompt("Copia este enlace:", window.location.href);
-  }
-});
+if (els.copyLinkBtn) {
+  els.copyLinkBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      els.copyLinkBtn.textContent = "Enlace copiado";
+      setTimeout(() => (els.copyLinkBtn.textContent = "Copiar enlace"), 1200);
+    } catch (e) {
+      prompt("Copia este enlace:", window.location.href);
+    }
+  });
+}
 
-els.resetBtn.addEventListener("click", () => {
-  lastFlashedEventTurn = null;
-  lastKoEventTurn = null;
-  flashCells = new Set();
-  koAutoCloseToken++;
-  hideKoModal();
-  socket.emit("reset_game");
-});
+if (els.resetBtn) {
+  els.resetBtn.addEventListener("click", () => {
+    lastFlashedEventTurn = null;
+    lastKoEventTurn = null;
+    flashCells = new Set();
+    koAutoCloseToken++;
+    hideKoModal();
+    socket.emit("reset_game");
+  });
+}
 
 // ===== Modal KO eventos =====
 if (els.koContinueBtn) {
