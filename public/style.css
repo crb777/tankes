@@ -498,3 +498,37 @@ kbd {
   width: 100%;
   margin: 6px 0 4px 0;
 }
+
+/* ===== 3 tarjetitas (Sala / Rol / Controles) ===== */
+.tri-cards{
+  display:grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 920px){
+  .tri-cards{
+    grid-template-columns: 1fr;
+  }
+}
+
+.mini-card{
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.mini-actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Slider */
+.slider{
+  width: 100%;
+  margin-top: 8px;
+  accent-color: var(--btn);
+}

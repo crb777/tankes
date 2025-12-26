@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>tankes — combate táctico por turnos</title>
-  <link rel="stylesheet" href="style.css?v=0.7.3" />
+  <link rel="stylesheet" href="style.css?v=0.7.4" />
 </head>
 <body>
   <main class="wrap">
@@ -13,8 +13,10 @@
 
     <!-- INFO DE SALA -->
     <section class="card">
-      <div class="row">
-        <div>
+      <!-- 3 tarjetitas -->
+      <div class="tri-cards">
+        <!-- Card 1: Sala -->
+        <div class="mini-card">
           <div class="label">Sala</div>
           <div class="mono" id="roomId">—</div>
           <div class="hint">
@@ -22,29 +24,35 @@
           </div>
         </div>
 
-        <div>
+        <!-- Card 2: Rol -->
+        <div class="mini-card">
           <div class="label">Tu rol</div>
           <div class="mono" id="role">—</div>
           <div class="hint">
-            Los jugadores son <strong>A</strong> y <strong>B</strong>.  
-            El resto de personas entran como <strong>espectadores</strong>.
+            Los jugadores son <strong>A</strong> y <strong>B</strong>. El resto entra como <strong>espectador</strong>.
           </div>
         </div>
 
-        <div class="actions">
-          <button id="copyLinkBtn" class="btn">Copiar enlace</button>
-          <button id="resetBtn" class="btn btn-secondary">Reset</button>
+        <!-- Card 3: Controles -->
+        <div class="mini-card">
+          <div class="label">Controles</div>
 
-          <div class="prob">
+          <div class="mini-actions">
+            <button id="copyLinkBtn" class="btn">Copiar enlace</button>
+            <button id="resetBtn" class="btn btn-secondary">Reset</button>
+          </div>
+
+          <div class="prob" style="margin-top:10px">
             <div class="label">Prob. muros rompibles</div>
-            <input id="probSlider" class="slider" type="range" min="0" max="100" step="1" value="18" />
-            <div class="mono"><span id="probValue">18</span>%</div>
+            <input id="probSlider" class="slider" type="range" min="0" max="100" step="1" value="10" />
+            <div class="mono"><span id="probValue">10</span>%</div>
             <div class="hint">Afecta al próximo reset (y a nuevas salas).</div>
           </div>
         </div>
       </div>
 
-      <div class="row">
+      <!-- fila de estado (se queda como estaba) -->
+      <div class="row" style="margin-top:12px">
         <div>
           <div class="label">Turno</div>
           <div class="mono" id="turn">—</div>
@@ -141,7 +149,7 @@
 
     <!-- PIE -->
     <footer class="footer">
-      <span>tankes — prototipo · v0.7.3</span>
+      <span>tankes — prototipo · v0.7.4</span>
     </footer>
   </main>
 
@@ -158,6 +166,6 @@
 
   <!-- Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=0.7.3"></script>
+  <script src="client.js?v=0.7.4"></script>
 </body>
 </html>
