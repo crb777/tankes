@@ -14,7 +14,7 @@ const els = {
 
   // Controles por botones
   controlPanel: document.getElementById("controlPanel"),
-  controlHint: document.getElementById("controlHint")
+  controlHint: document.getElementById("controlHint"),
 
   // Modal KO
   koModal: document.getElementById("koModal"),
