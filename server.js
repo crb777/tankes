@@ -80,8 +80,8 @@ function makeBaseGrid() {
     "#..........#",
     "#..#....#..#",
     "#*..*..*..*#",
-    "#.....##...#",
-    "#.....##...#",
+    "#....##....#",
+    "#....##....#",
     "#*..*..*..*#",
     "#..#....#..#",
     "#..........#",
@@ -290,6 +290,18 @@ function moveTank(room, who, steps) {
   t.body = { x, y };
 }
 
+function shiftAimByTankDelta(room, who, fromPos, toPos) {
+  const dx = toPos.x - fromPos.x;
+  const dy = toPos.y - fromPos.y;
+  if (dx === 0 && dy === 0) return;
+
+  const t = room.tanks[who];
+  t.aim = {
+    x: clamp(t.aim.x + dx, 0, GRID_W - 1),
+    y: clamp(t.aim.y + dy, 0, GRID_H - 1)
+  };
+}
+
 // ---- Explosión en cruz "+" ----
 function crossCells(cx, cy) {
   const cells = [
@@ -327,28 +339,36 @@ function applyExplosion(room, cx, cy) {
 
 function respawn(room, who) {
   const t = room.tanks[who];
-  // respawn simple: a su spawn si está libre; si no, buscar alrededor
-  const candidates = [
-    [t.spawn.x, t.spawn.y],
-    [t.spawn.x + 1, t.spawn.y],
-    [t.spawn.x - 1, t.spawn.y],
-    [t.spawn.x, t.spawn.y + 1],
-    [t.spawn.x, t.spawn.y - 1]
-  ].filter(([x, y]) => inBounds(x, y));
 
-  for (const [x, y] of candidates) {
-    const free = room.grid[y][x] === 0
-      && !(room.tanks.A.body.x === x && room.tanks.A.body.y === y)
-      && !(room.tanks.B.body.x === x && room.tanks.B.body.y === y);
-    if (free) {
-      t.body = { x, y };
-      // mantén orientación y aim, pero reajusta aim si cae fuera
-      t.aim = { x: clamp(t.aim.x, 0, GRID_W - 1), y: clamp(t.aim.y, 0, GRID_H - 1) };
-      return;
+  // 1) Lista de casillas vacías (sin muros) y sin tanque encima
+  const empties = [];
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (room.grid[y][x] !== 0) continue;
+
+      // Evitar caer encima del otro tanque (o del propio si aún no fue movido por lógica)
+      const occupied =
+        (room.tanks.A.body.x === x && room.tanks.A.body.y === y) ||
+        (room.tanks.B.body.x === x && room.tanks.B.body.y === y);
+
+      if (!occupied) empties.push([x, y]);
     }
   }
 
-  // Si no hay sitio, coloca igualmente (caso extremo)
+  // 2) Si hay huecos, elige uno al azar (uniforme)
+  if (empties.length > 0) {
+    const [x, y] = empties[Math.floor(Math.random() * empties.length)];
+    t.body = { x, y };
+
+    // Ajustar mirilla dentro de límites (opcional)
+    t.aim = {
+      x: clamp(t.aim.x, 0, GRID_W - 1),
+      y: clamp(t.aim.y, 0, GRID_H - 1)
+    };
+    return;
+  }
+
+  // 3) Caso extremo: no hay casillas vacías (no debería pasar salvo mapas absurdos)
   t.body = { ...t.spawn };
 }
 
@@ -379,26 +399,31 @@ function resolveTurn(room) {
     }
   }
 
-  // 2) MOVE (posiciones)
-  // (Se resuelve sin colisión tanque-tanque en este MVP; si chocan, los dejaremos coexistir? Mejor: rebote.)
-  // Primero aplicamos movimientos tentativos:
-  const nextPos = { A: { ...room.tanks.A.body }, B: { ...room.tanks.B.body } };
+  // 2) MOVE (posiciones) + “la mirilla se mueve con el tanque”
+  // Primero calculamos movimientos tentativos SIN aplicarlos definitivamente
+  const fromPos = {
+    A: { ...room.tanks.A.body },
+    B: { ...room.tanks.B.body }
+  };
+
+  const nextPos = {
+    A: { ...room.tanks.A.body },
+    B: { ...room.tanks.B.body }
+  };
 
   for (const who of ["A", "B"]) {
     const act = room.pending[who];
     if (act.type === "MOVE") {
-      // mover sobre una copia temporal: clonamos y aplicamos sobre room directamente
       const before = { ...room.tanks[who].body };
       moveTank(room, who, act.steps);
       nextPos[who] = { ...room.tanks[who].body };
-      // restauraremos si hay rebote, así que guardamos before
-      room.tanks[who].body = before;
+      room.tanks[who].body = before; // revertimos, aplicaremos luego
     }
   }
 
   // Resolver colisión tanque-tanque: si acaban en la misma casilla o swap => ambos se quedan donde estaban
-  const aFrom = { ...room.tanks.A.body };
-  const bFrom = { ...room.tanks.B.body };
+  const aFrom = fromPos.A;
+  const bFrom = fromPos.B;
   const aTo = nextPos.A;
   const bTo = nextPos.B;
 
@@ -406,9 +431,15 @@ function resolveTurn(room) {
   const swap = (aTo.x === bFrom.x && aTo.y === bFrom.y && bTo.x === aFrom.x && bTo.y === aFrom.y);
 
   if (!same && !swap) {
+    // Aplicar posiciones finales
     room.tanks.A.body = aTo;
     room.tanks.B.body = bTo;
+
+    // Mover mirillas con el delta real del tanque (solo si el tanque se movió)
+    shiftAimByTankDelta(room, "A", aFrom, aTo);
+    shiftAimByTankDelta(room, "B", bFrom, bTo);
   } else {
+    // Rebote: nadie se mueve => mirillas NO se mueven
     room.tanks.A.body = aFrom;
     room.tanks.B.body = bFrom;
     room.lastEvent.moveBounce = true;
