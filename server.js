@@ -150,7 +150,7 @@ function newRoom(roomId) {
   // OJO: aquí usamos (1,1) y (GRID_W-2, GRID_H-2) como spawns reales.
   sprinkleBreakables(
     grid,
-    0.10,                 // <-- PROBABILIDAD (0..1). Cambia aquí
+    room.breakableProb,                 // <-- PROBABILIDAD (0..1)
     1, 1, 10, 10,          // rectángulo a recorrer (x1,y1,x2,y2)
     [
       [spawnA.x, spawnA.y],
@@ -161,6 +161,8 @@ function newRoom(roomId) {
   return {
     roomId,
     players: { A: null, B: null },
+
+    breakableProb: 0.10, // <-- por defecto (10%)
 
     grid, // 0 vacío, 1 rompible, 2 indestructible
 
@@ -217,6 +219,9 @@ function sanitizeRoom(room, forRole) {
   return {
     roomId: room.roomId,
     occupied: { A: !!room.players.A, B: !!room.players.B },
+
+    breakableProb: room.breakableProb,
+
     gridW: GRID_W,
     gridH: GRID_H,
     grid: room.grid,
@@ -577,8 +582,33 @@ io.on("connection", (socket) => {
     // Mantener ocupación
     const fresh = newRoom(roomId);
     fresh.players = { ...room.players };
+
+    // conservar probabilidad actual
+    fresh.breakableProb = room.breakableProb;
+
+    // (opcional) re-aplicar sprinkleBreakables con esa probabilidad si tu newRoom no lo aplica ya
+    // sprinkleBreakables(fresh.grid, fresh.breakableProb, 1, 1, GRID_W - 2, GRID_H - 2, [[1,1],[GRID_W-2,GRID_H-2]]);
+
     rooms.set(roomId, fresh);
     broadcastRoom(fresh);
+  });
+
+  socket.on("set_breakable_prob", ({ prob }) => {
+    const roomId = socket.data.roomId;
+    const role = socket.data.role;
+    if (!roomId) return;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Solo A/B pueden cambiar la probabilidad
+    if (role !== "A" && role !== "B") return;
+
+    const p = Number(prob);
+    if (!Number.isFinite(p)) return;
+
+    room.breakableProb = Math.max(0, Math.min(1, p));
+    broadcastRoom(room);
   });
 
   socket.on("disconnect", () => {

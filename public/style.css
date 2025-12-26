@@ -478,3 +478,23 @@ kbd {
   font-size: 11px;
 }
 
+/* Slider probabilidad muros */
+.actions{
+  display:flex;
+  gap: 10px;
+  align-items:flex-start;
+  flex-wrap: wrap;
+}
+
+.prob{
+  min-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+}
+
+.slider{
+  width: 100%;
+  margin: 6px 0 4px 0;
+}

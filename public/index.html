@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>tankes — combate táctico por turnos</title>
-  <link rel="stylesheet" href="style.css?v=0.6.9" />
+  <link rel="stylesheet" href="style.css?v=0.7.0" />
 </head>
 <body>
   <main class="wrap">
@@ -34,6 +34,13 @@
         <div class="actions">
           <button id="copyLinkBtn" class="btn">Copiar enlace</button>
           <button id="resetBtn" class="btn btn-secondary">Reset</button>
+
+          <div class="prob">
+            <div class="label">Prob. muros rompibles</div>
+            <input id="probSlider" class="slider" type="range" min="0" max="100" step="1" value="18" />
+            <div class="mono"><span id="probValue">18</span>%</div>
+            <div class="hint">Afecta al próximo reset (y a nuevas salas).</div>
+          </div>
         </div>
       </div>
 
@@ -134,7 +141,7 @@
 
     <!-- PIE -->
     <footer class="footer">
-      <span>tankes — prototipo · v0.6.9</span>
+      <span>tankes — prototipo · v0.7.0</span>
     </footer>
   </main>
 
@@ -151,6 +158,6 @@
 
   <!-- Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=0.6.9"></script>
+  <script src="client.js?v=0.7.0"></script>
 </body>
 </html>

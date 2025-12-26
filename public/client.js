@@ -12,6 +12,11 @@ const els = {
   copyLinkBtn: document.getElementById("copyLinkBtn"),
   resetBtn: document.getElementById("resetBtn"),
 
+  resetBtn: document.getElementById("resetBtn"),
+
+  probSlider: document.getElementById("probSlider"),
+  probValue: document.getElementById("probValue"),
+
   // Controles por botones
   controlPanel: document.getElementById("controlPanel"),
   controlHint: document.getElementById("controlHint"),
@@ -289,6 +294,30 @@ function bindButtonControls() {
   });
 }
 
+function bindProbSlider() {
+  if (!els.probSlider || !els.probValue) return;
+
+  const updateUI = (v) => {
+    els.probValue.textContent = String(v);
+  };
+
+  // UI inicial
+  updateUI(els.probSlider.value);
+
+  // Cambiar valor: actualiza UI + envía al servidor
+  const send = () => {
+    const v = Number(els.probSlider.value); // 0..100
+    updateUI(v);
+
+    // Solo jugadores pueden modificar en servidor
+    if (!(myRole === "A" || myRole === "B")) return;
+
+    socket.emit("set_breakable_prob", { prob: v / 100 });
+  };
+
+  els.probSlider.addEventListener("input", send);
+}
+
 // Acciones (MVP teclado):
 // - Flechas: AIM (mueve mirilla 1)
 // - Shift + flecha: AIM (mueve mirilla 2)
@@ -318,6 +347,20 @@ socket.on("your_role", ({ role }) => {
 
 socket.on("room_state", (state) => {
   lastState = state;
+
+  // Sincronizar slider con el valor real de la sala (para jugadores y espectadores)
+  if (els.probSlider && typeof state.breakableProb === "number") {
+    const v = Math.round(state.breakableProb * 100);
+    els.probSlider.value = String(v);
+    if (els.probValue) els.probValue.textContent = String(v);
+
+    // Espectadores: deshabilitar slider
+    if (!(myRole === "A" || myRole === "B")) {
+      els.probSlider.disabled = true;
+    } else {
+      els.probSlider.disabled = false;
+    }
+  }
 
   // ===== Explosión animada/temporal (solo una vez por turno resuelto) =====
   const evt = state.lastEvent || null;
@@ -436,3 +479,4 @@ if (els.koModal) {
 
 // ===== Controles por botones =====
 bindButtonControls();
+bindProbSlider();
