@@ -140,22 +140,23 @@ function sprinkleBreakables(grid, prob, x1 = 1, y1 = 1, x2 = 10, y2 = 10, forbid
 }
 
 // ---- Estado de sala ----
-function newRoom(roomId) {
+function newRoom(roomId, breakableProbOverride) {
   const grid = makeBaseGrid();
 
   const spawnA = { x: 1, y: 1 };
   const spawnB = { x: GRID_W - 2, y: GRID_H - 2 };
 
   // Si llega override (slider), úsalo; si no, usa el default
-  const breakableProb = Number.isFinite(Number(breakableProbOverride))
-    ? Math.max(0, Math.min(1, Number(breakableProbOverride)))
+  const raw = Number(breakableProbOverride);
+  const breakableProb = Number.isFinite(raw)
+    ? Math.max(0, Math.min(1, raw))
     : 0.10;
 
   // Relleno probabilístico de muros rompibles dentro del área 1..10
   sprinkleBreakables(
     grid,
-    breakableProb,            // ✅ aquí va la constante, no "room.breakableProb"
-    1, 1, 10, 10,             // rectángulo a recorrer (x1,y1,x2,y2)
+    breakableProb,
+    1, 1, 10, 10,
     [
       [spawnA.x, spawnA.y],
       [spawnB.x, spawnB.y]
@@ -166,9 +167,9 @@ function newRoom(roomId) {
     roomId,
     players: { A: null, B: null },
 
-    breakableProb, // ✅ guardas el valor en la sala
+    breakableProb,
 
-    grid, // 0 vacío, 1 rompible, 2 indestructible
+    grid,
 
     tanks: {
       A: {
