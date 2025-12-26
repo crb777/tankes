@@ -12,8 +12,6 @@ const els = {
   copyLinkBtn: document.getElementById("copyLinkBtn"),
   resetBtn: document.getElementById("resetBtn"),
 
-  resetBtn: document.getElementById("resetBtn"),
-
   probSlider: document.getElementById("probSlider"),
   probValue: document.getElementById("probValue"),
 
@@ -48,6 +46,9 @@ els.roomId.textContent = roomId;
 let lastState = null;
 let myRole = "—";
 let canActNow = false;
+
+let isDraggingProbSlider = false;
+let lastServerProbPct = null;
 
 // Para mostrar qué acción has elegido en este turno
 let myLastAction = null;
@@ -304,6 +305,12 @@ function bindProbSlider() {
   // UI inicial
   updateUI(els.probSlider.value);
 
+  // Marcar cuando el usuario está interactuando (para que room_state no pise)
+  els.probSlider.addEventListener("pointerdown", () => { isDraggingProbSlider = true; });
+  els.probSlider.addEventListener("pointerup", () => { isDraggingProbSlider = false; });
+  els.probSlider.addEventListener("touchstart", () => { isDraggingProbSlider = true; }, { passive: true });
+  els.probSlider.addEventListener("touchend", () => { isDraggingProbSlider = false; }, { passive: true });
+
   // Cambiar valor: actualiza UI + envía al servidor
   const send = () => {
     const v = Number(els.probSlider.value); // 0..100
@@ -351,14 +358,17 @@ socket.on("room_state", (state) => {
   // Sincronizar slider con el valor real de la sala (para jugadores y espectadores)
   if (els.probSlider && typeof state.breakableProb === "number") {
     const v = Math.round(state.breakableProb * 100);
-    els.probSlider.value = String(v);
-    if (els.probValue) els.probValue.textContent = String(v);
 
-    // Espectadores: deshabilitar slider
-    if (!(myRole === "A" || myRole === "B")) {
-      els.probSlider.disabled = true;
-    } else {
-      els.probSlider.disabled = false;
+    // habilitar/deshabilitar según rol
+    els.probSlider.disabled = !(myRole === "A" || myRole === "B");
+
+    // sincronizar desde servidor SOLO si:
+    // - no estás moviendo el slider
+    // - y cambió respecto al último valor visto del servidor
+    if (!isDraggingProbSlider && v !== lastServerProbPct) {
+      lastServerProbPct = v;
+      els.probSlider.value = String(v);
+      if (els.probValue) els.probValue.textContent = String(v);
     }
   }
 

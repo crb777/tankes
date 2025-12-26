@@ -146,7 +146,10 @@ function newRoom(roomId) {
   const spawnA = { x: 1, y: 1 };
   const spawnB = { x: GRID_W - 2, y: GRID_H - 2 };
 
-  const breakableProb = 0.10; // <-- valor por defecto (0..1)
+  // Si llega override (slider), úsalo; si no, usa el default
+  const breakableProb = Number.isFinite(Number(breakableProbOverride))
+    ? Math.max(0, Math.min(1, Number(breakableProbOverride)))
+    : 0.10;
 
   // Relleno probabilístico de muros rompibles dentro del área 1..10
   sprinkleBreakables(
@@ -567,30 +570,25 @@ io.on("connection", (socket) => {
     resolveTurn(room);
   });
 
-  socket.on("reset_game", () => {
-    const roomId = socket.data.roomId;
-    const role = socket.data.role;
-    if (!roomId) return;
+socket.on("reset_game", () => {
+  const roomId = socket.data.roomId;
+  const role = socket.data.role;
+  if (!roomId) return;
 
-    const room = rooms.get(roomId);
-    if (!room) return;
+  const room = rooms.get(roomId);
+  if (!room) return;
 
-    // Solo jugadores A/B pueden resetear
-    if (role !== "A" && role !== "B") return;
+  if (role !== "A" && role !== "B") return;
 
-    // Mantener ocupación
-    const fresh = newRoom(roomId);
-    fresh.players = { ...room.players };
+  // Crear nuevo room aplicando la probabilidad actual del slider
+  const fresh = newRoom(roomId, room.breakableProb);
 
-    // conservar probabilidad actual
-    fresh.breakableProb = room.breakableProb;
+  // Mantener ocupación
+  fresh.players = { ...room.players };
 
-    // (opcional) re-aplicar sprinkleBreakables con esa probabilidad si tu newRoom no lo aplica ya
-    // sprinkleBreakables(fresh.grid, fresh.breakableProb, 1, 1, GRID_W - 2, GRID_H - 2, [[1,1],[GRID_W-2,GRID_H-2]]);
-
-    rooms.set(roomId, fresh);
-    broadcastRoom(fresh);
-  });
+  rooms.set(roomId, fresh);
+  broadcastRoom(fresh);
+});
 
   socket.on("set_breakable_prob", ({ prob }) => {
     const roomId = socket.data.roomId;
