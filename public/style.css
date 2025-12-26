@@ -111,8 +111,8 @@ h1{
 .btn-secondary{ background: var(--btn2); }
 
 .board{
-  width: min(720px, 96vw);
-  height: min(720px, 96vw);
+  width: min(520px, 96vw);
+  height: min(520px, 96vw);
   display:grid;
   gap: 6px;
   margin: 10px auto 14px auto;
