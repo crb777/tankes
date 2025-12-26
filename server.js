@@ -113,6 +113,31 @@ function makeBaseGrid() {
   return g;
 }
 
+function sprinkleBreakables(grid, prob, x1 = 1, y1 = 1, x2 = 10, y2 = 10, forbidden = []) {
+  // prob en [0..1]
+  const p = Math.max(0, Math.min(1, Number(prob) || 0));
+
+  // Para comparar rápido
+  const forbid = new Set(forbidden.map(([x, y]) => `${x},${y}`));
+
+  for (let y = y1; y <= y2; y++) {
+    for (let x = x1; x <= x2; x++) {
+      // Saltar casillas fuera del grid por seguridad
+      if (!grid[y] || typeof grid[y][x] === "undefined") continue;
+
+      // Saltar casillas prohibidas (spawns, etc.)
+      if (forbid.has(`${x},${y}`)) continue;
+
+      // Solo si está vacía
+      if (grid[y][x] !== 0) continue;
+
+      // Probabilidad de poner muro rompible (1)
+      if (Math.random() < p) {
+        grid[y][x] = 1;
+      }
+    }
+  }
+}
 
 // ---- Estado de sala ----
 function newRoom(roomId) {
@@ -120,6 +145,18 @@ function newRoom(roomId) {
 
   const spawnA = { x: 1, y: 1 };
   const spawnB = { x: GRID_W - 2, y: GRID_H - 2 };
+
+  // Relleno probabilístico de muros rompibles dentro del área 1..10 (ajusta prob a tu gusto)
+  // OJO: aquí usamos (1,1) y (GRID_W-2, GRID_H-2) como spawns reales.
+  sprinkleBreakables(
+    grid,
+    0.10,                 // <-- PROBABILIDAD (0..1). Cambia aquí
+    1, 1, 10, 10,          // rectángulo a recorrer (x1,y1,x2,y2)
+    [
+      [spawnA.x, spawnA.y],
+      [spawnB.x, spawnB.y]
+    ]
+  );
 
   return {
     roomId,
