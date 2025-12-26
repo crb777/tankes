@@ -146,12 +146,13 @@ function newRoom(roomId) {
   const spawnA = { x: 1, y: 1 };
   const spawnB = { x: GRID_W - 2, y: GRID_H - 2 };
 
-  // Relleno probabilístico de muros rompibles dentro del área 1..10 (ajusta prob a tu gusto)
-  // OJO: aquí usamos (1,1) y (GRID_W-2, GRID_H-2) como spawns reales.
+  const breakableProb = 0.10; // <-- valor por defecto (0..1)
+
+  // Relleno probabilístico de muros rompibles dentro del área 1..10
   sprinkleBreakables(
     grid,
-    room.breakableProb,                 // <-- PROBABILIDAD (0..1)
-    1, 1, 10, 10,          // rectángulo a recorrer (x1,y1,x2,y2)
+    breakableProb,            // ✅ aquí va la constante, no "room.breakableProb"
+    1, 1, 10, 10,             // rectángulo a recorrer (x1,y1,x2,y2)
     [
       [spawnA.x, spawnA.y],
       [spawnB.x, spawnB.y]
@@ -162,7 +163,7 @@ function newRoom(roomId) {
     roomId,
     players: { A: null, B: null },
 
-    breakableProb: 0.10, // <-- por defecto (10%)
+    breakableProb, // ✅ guardas el valor en la sala
 
     grid, // 0 vacío, 1 rompible, 2 indestructible
 
@@ -170,23 +171,21 @@ function newRoom(roomId) {
       A: {
         body: { ...spawnA },
         spawn: { ...spawnA },
-        orientation: "V", // eje vertical al inicio
-        face: "D", // A mira hacia abajo al inicio
+        orientation: "V",
+        face: "D",
         aim: { x: spawnA.x, y: spawnA.y + 2 }
       },
       B: {
         body: { ...spawnB },
         spawn: { ...spawnB },
         orientation: "V",
-        face: "U", // B mira hacia arriba al inicio
+        face: "U",
         aim: { x: spawnB.x, y: spawnB.y - 2 }
       }
     },
 
     turn: 1,
-    pending: { A: null, B: null }, // acción pendiente por jugador
-
-    // eventos del último turno para UI
+    pending: { A: null, B: null },
     lastEvent: null,
     score: { A: 0, B: 0 }
   };
