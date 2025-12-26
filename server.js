@@ -64,46 +64,55 @@ function deepCopyGrid(g) {
   return g.map(row => row.slice());
 }
 
-// ---- Generación de mapa (MVP fijo y claro) ----
+// ---- Generación de mapa (visual / editable) ----
+// Leyenda:
+//   # = muro indestructible (2)
+//   * = muro rompible (1)
+//   . = vacío (0)
+//
+// Reglas:
+// - Debe haber exactamente GRID_H filas
+// - Cada fila debe tener exactamente GRID_W caracteres
 function makeBaseGrid() {
+  const rows = [
+    "############",
+    "#...****...#",
+    "#..........#",
+    "#..#....#..#",
+    "#*..*..*..*#",
+    "#.....##...#",
+    "#.....##...#",
+    "#*..*..*..*#",
+    "#..#....#..#",
+    "#..........#",
+    "#...****...#",
+    "############",
+  ];
+
+  // Validación: si cambias GRID_W/H, te avisará en consola
+  if (rows.length !== GRID_H) {
+    throw new Error(`MAP: filas=${rows.length} pero GRID_H=${GRID_H}`);
+  }
+  for (let y = 0; y < rows.length; y++) {
+    if (rows[y].length !== GRID_W) {
+      throw new Error(`MAP: fila ${y} tiene ${rows[y].length} chars pero GRID_W=${GRID_W}`);
+    }
+  }
+
   const g = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
 
-  // Borde indestructible
-  for (let x = 0; x < GRID_W; x++) {
-    g[0][x] = 2;
-    g[GRID_H - 1][x] = 2;
-  }
   for (let y = 0; y < GRID_H; y++) {
-    g[y][0] = 2;
-    g[y][GRID_W - 1] = 2;
-  }
-
-  // Algunos indestructibles internos (pilares)
-  const pillars = [
-    [3, 3], [8, 3],
-    [3, 8], [8, 8],
-    [6, 5], [6, 6]
-  ];
-  for (const [x, y] of pillars) g[y][x] = 2;
-
-  // Muros rompibles (zonas)
-  const breakables = [
-    // banda superior media
-    [4,1],[5,1],[6,1],[7,1],
-    // banda inferior media
-    [4,10],[5,10],[6,10],[7,10],
-    // bloques laterales
-    [1,4],[1,5],[1,6],
-    [10,4],[10,5],[10,6],
-    // algunos en centro
-    [5,4],[7,4],[5,7],[7,7]
-  ];
-  for (const [x, y] of breakables) {
-    if (g[y]?.[x] === 0) g[y][x] = 1;
+    for (let x = 0; x < GRID_W; x++) {
+      const ch = rows[y][x];
+      if (ch === "#") g[y][x] = 2;
+      else if (ch === "*") g[y][x] = 1;
+      else g[y][x] = 0; // '.' o cualquier otro
+    }
   }
 
   return g;
 }
+
 
 // ---- Estado de sala ----
 function newRoom(roomId) {
