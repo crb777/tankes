@@ -315,13 +315,14 @@ socket.on("room_state", (state) => {
   // UI básica
   els.turn.textContent = state.turn;
 
+  // DIBUJAR TABLERO (esto faltaba)
+  renderBoard(state);
+
   // Nuevo turno → limpiar acción previa
   if (!state.pending.A && !state.pending.B) {
     myLastAction = null;
   }
 
-  // (Recomendado) Ocultar pistas: no mostrar estado por jugador, solo genérico.
-  // Si quieres mantenerlo, deja tu línea original.
   const isPlayer = myRole === "A" || myRole === "B";
 
   if (!isPlayer) {
