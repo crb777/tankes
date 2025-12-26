@@ -39,6 +39,7 @@ els.roomId.textContent = roomId;
 let lastState = null;
 let myRole = "—";
 let canActNow = false;
+let myLastAction = null; // para mostrar qué he hecho este turno
 
 // Para evitar repetición (key repeat)
 const pressed = new Set();
@@ -176,9 +177,22 @@ function prettyLastEvent(evt) {
   return pieces.join(" · ");
 }
 
+function describeAction(act) {
+  if (!act) return "—";
+  switch (act.type) {
+    case "MOVE": return `Mover tanque (${act.steps})`;
+    case "TURN": return "Girar tanque";
+    case "AIM":  return `Mover mirilla (${act.dx}, ${act.dy})`;
+    case "FIRE": return "Disparar";
+    case "WAIT": return "Esperar";
+    default: return "Acción desconocida";
+  }
+}
+
 // ===== Envío de acciones =====
 function sendAction(action) {
   if (!canActNow) return;
+  myLastAction = action;
   socket.emit("submit_action", action);
 }
 
@@ -301,31 +315,44 @@ socket.on("room_state", (state) => {
   // UI básica
   els.turn.textContent = state.turn;
 
+  // Nuevo turno → limpiar acción previa
+  if (!state.pending.A && !state.pending.B) {
+    myLastAction = null;
+  }
+
   // (Recomendado) Ocultar pistas: no mostrar estado por jugador, solo genérico.
   // Si quieres mantenerlo, deja tu línea original.
-  if (els.pending) {
-    els.pending.textContent = state.pending && (state.pending.A || state.pending.B)
-      ? "Pendiente: esperando acciones…"
-      : "Pendiente: —";
-  }
-
-  // Marcador (si existe en el HTML)
-  if (els.score && state.score) {
-    els.score.textContent = `A ${state.score.A} – ${state.score.B} B`;
-  }
-
-  renderBoard(state);
-
   const isPlayer = myRole === "A" || myRole === "B";
-  const canMoveNow = isPlayer && !state.pending[myRole];
-  setControlsEnabled(canMoveNow);
 
   if (!isPlayer) {
-    setStatus("Observando partida.");
-  } else if (canMoveNow) {
-    setStatus("Tu turno. Elige 1 acción.");
+    // ===== ESPECTADOR =====
+    els.pending.textContent = "—";
+    els.status.textContent = "Observando la partida. Esperando acciones de A y B.";
+    setControlsEnabled(false);
+    return;
+  }
+
+  // ===== JUGADOR A o B =====
+  const myPending = state.pending[myRole];
+  const otherRole = myRole === "A" ? "B" : "A";
+  const otherPending = state.pending[otherRole];
+
+  if (!myPending) {
+    // Yo aún no he enviado acción
+    els.pending.textContent = "Aún no has elegido acción";
+    els.status.textContent = "Tu turno: elige una acción";
+    setControlsEnabled(true);
   } else {
-    setStatus("Acción enviada. Esperando al otro jugador…");
+    // Yo ya he enviado acción
+    els.pending.textContent = `Has elegido: ${describeAction(myLastAction)}`;
+
+    if (otherPending) {
+      els.status.textContent = "Ambas acciones recibidas. Resolviendo turno…";
+    } else {
+      els.status.textContent = `Esperando acción del jugador ${otherRole}…`;
+    }
+
+    setControlsEnabled(false);
   }
 });
 
